@@ -5,6 +5,8 @@ public class IncidenciaDTO {
     private String titulo;
     private String descripcion;
     private Long equipoId;
+    /** Usuario solicitante (opcional): si no llega, es el usuario que registra la incidencia. */
+    private Long solicitanteId;
 
     public IncidenciaDTO() {}
 
@@ -36,6 +38,12 @@ public class IncidenciaDTO {
 	}
 	public void setEquipoId(Long equipoId) {
 		this.equipoId = equipoId;
+	}
+	public Long getSolicitanteId() {
+		return solicitanteId;
+	}
+	public void setSolicitanteId(Long solicitanteId) {
+		this.solicitanteId = solicitanteId;
 	}
 }
 

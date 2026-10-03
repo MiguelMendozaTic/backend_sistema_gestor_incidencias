@@ -21,13 +21,14 @@ public interface IncidenciaRepository extends JpaRepository<Incidencia, Long> {
 			String descripcion,
 			Pageable pageable);
 
+	// "Mis incidencias": las que registré, en las que soy solicitante o que tengo asignadas
 	@Query("SELECT i FROM Incidencia i " +
-			"WHERE i.usuario = :usuario OR i.tecnico = :usuario " +
+			"WHERE i.usuario = :usuario OR i.tecnico = :usuario OR i.solicitante = :usuario " +
 			"ORDER BY i.fechaCreacion DESC")
 	Page<Incidencia> findByUsuarioOrTecnico(@Param("usuario") Usuario usuario, Pageable pageable);
 
 	@Query("SELECT i FROM Incidencia i " +
-			"WHERE (i.usuario = :usuario OR i.tecnico = :tecnico) " +
+			"WHERE (i.usuario = :usuario OR i.tecnico = :tecnico OR i.solicitante = :usuario) " +
 			"AND (LOWER(i.titulo) LIKE LOWER(CONCAT('%', :texto, '%')) " +
 			"     OR LOWER(i.descripcion) LIKE LOWER(CONCAT('%', :texto, '%'))) " +
 			"ORDER BY i.fechaCreacion DESC")
@@ -41,21 +42,25 @@ public interface IncidenciaRepository extends JpaRepository<Incidencia, Long> {
 
 	List<Incidencia> findByTecnico(Usuario tecnico);
 
+	List<Incidencia> findBySolicitante(Usuario solicitante);
+
 	long countByEstado(EstadoIncidencia estado);
 
 	// Alternativa: obtener todos los conteos de un solo golpe (GROUP BY)
 	@Query("SELECT i.estado, COUNT(i) FROM Incidencia i GROUP BY i.estado")
 	List<Object[]> countGroupByEstado();
 
-	long countByUsuarioOrTecnico(Usuario usuario, Usuario tecnico);
+	// Dashboard del usuario: cuenta también las incidencias en las que es solicitante
+	long countByUsuarioOrTecnicoOrSolicitante(Usuario usuario, Usuario tecnico, Usuario solicitante);
 
-	@Query("SELECT COUNT(i) FROM Incidencia i WHERE (i.usuario = :usuario OR i.tecnico = :tecnico) AND i.estado = :estado")
+	@Query("SELECT COUNT(i) FROM Incidencia i WHERE (i.usuario = :usuario OR i.tecnico = :tecnico OR i.solicitante = :usuario) AND i.estado = :estado")
 	long countByUsuarioOrTecnicoAndEstado(@Param("usuario") Usuario usuario,
 			@Param("tecnico") Usuario tecnico,
 			@Param("estado") EstadoIncidencia estado);
 
 	// Últimos 5 incidencias registrados
-	List<Incidencia> findTop5ByUsuarioOrTecnicoOrderByFechaCreacionDesc(Usuario usuario, Usuario tecnico);
+	List<Incidencia> findTop5ByUsuarioOrTecnicoOrSolicitanteOrderByFechaCreacionDesc(Usuario usuario, Usuario tecnico,
+			Usuario solicitante);
 
 	@Query("SELECT new utp.edu.sistema_gestor_incidencias.dto.usuario.TecnicosDTO(u.id, u.nombre, COUNT(i)) " +
 			"FROM Usuario u " +

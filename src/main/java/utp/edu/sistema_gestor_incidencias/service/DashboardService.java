@@ -81,7 +81,7 @@ public class DashboardService {
         .orElseThrow(() -> new UsernameNotFoundException("El usuario no fue encontrado"));
     // --- 1. Estadísticas de Incidencias ---
     IncidentStatsDTO incidentStats = new IncidentStatsDTO();
-    incidentStats.setTotal(incidenciaRepo.countByUsuarioOrTecnico(usuarioLogueado, usuarioLogueado));
+    incidentStats.setTotal(incidenciaRepo.countByUsuarioOrTecnicoOrSolicitante(usuarioLogueado, usuarioLogueado, usuarioLogueado));
     incidentStats.setAbiertas(incidenciaRepo.countByUsuarioOrTecnicoAndEstado(usuarioLogueado,usuarioLogueado, EstadoIncidencia.ABIERTO));
     incidentStats.setEnProgreso(incidenciaRepo.countByUsuarioOrTecnicoAndEstado(usuarioLogueado,usuarioLogueado, EstadoIncidencia.PENDIENTE));
     incidentStats.setCerradas(incidenciaRepo.countByUsuarioOrTecnicoAndEstado(usuarioLogueado,usuarioLogueado, EstadoIncidencia.CERRADO));
@@ -89,7 +89,7 @@ public class DashboardService {
     Map<String, Object> response = new HashMap<>();
     response.put("incidentStats", incidentStats);
 
-    List<Incidencia> top5Incidencias = incidenciaRepo.findTop5ByUsuarioOrTecnicoOrderByFechaCreacionDesc(usuarioLogueado,usuarioLogueado);
+    List<Incidencia> top5Incidencias = incidenciaRepo.findTop5ByUsuarioOrTecnicoOrSolicitanteOrderByFechaCreacionDesc(usuarioLogueado, usuarioLogueado, usuarioLogueado);
     
     response.put("incidenciasRecientes", top5Incidencias);
     return response;

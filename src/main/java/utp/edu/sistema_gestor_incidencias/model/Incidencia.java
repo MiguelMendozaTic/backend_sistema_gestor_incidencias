@@ -38,6 +38,15 @@ public class Incidencia {
 	@ManyToOne
 	@JoinColumn(name = "equipo_id")
 	private Equipo equipo;
+	/** Usuario que solicita la atención; recibe las notificaciones en su correo registrado. */
+	@ManyToOne
+	@JoinColumn(name = "solicitante_id")
+	private Usuario solicitante;
+	/** Se llenan al pasar a CERRADO y se limpian si la incidencia se reabre. */
+	private Date fechaCierre;
+	@ManyToOne
+	@JoinColumn(name = "tecnico_cierre_id")
+	private Usuario tecnicoCierre;
 
 	public Incidencia() {
 	}
@@ -122,6 +131,45 @@ public class Incidencia {
 
 	public void setEquipo(Equipo equipo) {
 		this.equipo = equipo;
+	}
+
+	public Usuario getSolicitante() {
+		return solicitante;
+	}
+
+	public void setSolicitante(Usuario solicitante) {
+		this.solicitante = solicitante;
+	}
+
+	public Date getFechaCierre() {
+		return fechaCierre;
+	}
+
+	public void setFechaCierre(Date fechaCierre) {
+		this.fechaCierre = fechaCierre;
+	}
+
+	public Usuario getTecnicoCierre() {
+		return tecnicoCierre;
+	}
+
+	public void setTecnicoCierre(Usuario tecnicoCierre) {
+		this.tecnicoCierre = tecnicoCierre;
+	}
+
+	/** true si el usuario la registró, es su solicitante o es el técnico asignado. */
+	public boolean participa(Usuario u) {
+		if (u == null || u.getId() == null) return false;
+		return mismoId(usuario, u) || mismoId(solicitante, u) || mismoId(tecnico, u);
+	}
+
+	/** true si el usuario es el técnico asignado. */
+	public boolean esTecnicoAsignado(Usuario u) {
+		return u != null && u.getId() != null && mismoId(tecnico, u);
+	}
+
+	private static boolean mismoId(Usuario a, Usuario b) {
+		return a != null && b.getId().equals(a.getId());
 	}
 
 }

@@ -79,8 +79,6 @@ public class JwtAuthenticationFilter extends UsernamePasswordAuthenticationFilte
 
         Claims claims = Jwts.claims().add("authorities", authorities).build();
 
-        System.out.println("Authorities en el token: " + authorities);
-
         SecretKey key = Keys.hmacShaKeyFor(Decoders.BASE64.decode(tokenConfig.getSecretKey()));
 
         String token = Jwts.builder()
@@ -107,8 +105,8 @@ public class JwtAuthenticationFilter extends UsernamePasswordAuthenticationFilte
                                               AuthenticationException failed)
             throws IOException, ServletException {
         Map<String, String> body = new HashMap<>();
+        // Mensaje genérico: no revelar si el usuario existe o si la cuenta está inactiva.
         body.put("message", "Error en la autenticación, username o password incorrectos");
-        body.put("error", failed.getMessage());
 
         response.setContentType(TokenJwtConfig.CONTENT_TYPE);
         response.setStatus(401);

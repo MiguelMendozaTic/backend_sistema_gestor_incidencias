@@ -2,6 +2,8 @@ package utp.edu.sistema_gestor_incidencias.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
@@ -13,6 +15,8 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 import utp.edu.sistema_gestor_incidencias.dto.role.RoleDTO;
+import utp.edu.sistema_gestor_incidencias.dto.usuario.UsuarioDTO;
+import utp.edu.sistema_gestor_incidencias.dto.usuario.UsuarioResponseDto;
 import utp.edu.sistema_gestor_incidencias.enums.Area;
 import utp.edu.sistema_gestor_incidencias.enums.Estado;
 import utp.edu.sistema_gestor_incidencias.mappers.UsuarioMapper;
@@ -21,6 +25,7 @@ import utp.edu.sistema_gestor_incidencias.security.SpringSecurityConfig;
 import utp.edu.sistema_gestor_incidencias.security.TokenJwtConfig;
 import utp.edu.sistema_gestor_incidencias.service.IncidenciaService;
 import utp.edu.sistema_gestor_incidencias.service.UsuarioService;
+import utp.edu.sistema_gestor_incidencias.service.auth.AuthService;
 
 import java.util.HashSet;
 import java.util.List;
@@ -54,6 +59,8 @@ class UsuarioControllerTest {
   private UsuarioMapper usuarioMapper;
   @MockitoBean
   private TokenJwtConfig tokenJwtConfig;
+  @MockitoBean
+  private AuthService authService;
 
   private Usuario usuarioEjemplo() {
     Set<Role> role = new HashSet<>();
@@ -261,5 +268,260 @@ class UsuarioControllerTest {
         .with(user("usuarioComun").roles("TECNICO"))
         .with(csrf()))
         .andExpect(status().isForbidden());
+  }
+
+  // GET /api/usuario/{username}/username — cada uno solo ve su propio perfil
+  @Test
+  void perfilPorUsername_propio_retorna200SinPasswordHash() throws Exception {
+    when(usuarioService.obtenerUsuarioPorUsername("abel")).thenReturn(Optional.of(usuarioEjemplo()));
+
+    mockMvc.perform(get("/api/usuario/abel/username")
+        .with(user("abel").roles("EMPLEADO")))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.username").value("abel"))
+        .andExpect(jsonPath("$.passwordHash").doesNotExist());
+  }
+
+  @Test
+  void perfilPorUsername_deOtroUsuario_retorna403() throws Exception {
+    mockMvc.perform(get("/api/usuario/abel/username")
+        .with(user("intruso").roles("EMPLEADO")))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
+  void perfilPorUsername_sinSesion_retorna401o403() throws Exception {
+    mockMvc.perform(get("/api/usuario/abel/username"))
+        .andExpect(result -> {
+          int s = result.getResponse().getStatus();
+          if (s != 401 && s != 403) throw new AssertionError("Esperaba 401/403 y fue " + s);
+        });
+  }
+
+  // JSON tal como lo envía el formulario de alta del panel admin (user-form-component)
+  private String jsonAltaDesdePanel(String nombre, String rol) {
+    return jsonAltaDesdePanel(nombre, rol, "@Admin123");
+  }
+
+  private String jsonAltaDesdePanel(String nombre, String rol, String password) {
+    return """
+        {"area":"SISTEMAS","nombre":"%s","correo":"ana.torres@empresa.com","username":"ana.torres",
+         "password":"%s","confirmPassword":"%s","rol":"%s"}
+        """.formatted(nombre, password, password, rol);
+  }
+
+  // POST /api/usuario — contraseñas que no cumplen la política (6+, mayúscula, minúscula, número)
+  @ParameterizedTest
+  @ValueSource(strings = { "Ab1", "clave123", "CLAVE123", "ClaveSegura", "Clave123", "@Clave 123" })
+  void crearUsuario_passwordDebil_retorna400(String password) throws Exception {
+    mockMvc.perform(post("/api/usuario")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(jsonAltaDesdePanel("Ana Torres", "ROLE_EMPLEADO", password))
+        .with(user("adminUser").roles("ADMIN"))
+        .with(csrf()))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.errors.password")
+            .value("La contraseña debe tener mínimo 6 caracteres, una mayúscula, una minúscula, un número y un carácter especial"));
+  }
+
+  // POST /api/usuario — alta por el admin con un nombre completo de más de 20 caracteres
+  @Test
+  void crearUsuario_admin_retorna201ConNombreCompleto() throws Exception {
+    Usuario usuario = usuarioEjemplo();
+    when(usuarioMapper.toEntity(any())).thenReturn(usuario);
+    when(authService.register(any(Usuario.class), eq("ROLE_TECNICO_NIVEL_2"))).thenReturn(usuario);
+
+    mockMvc.perform(post("/api/usuario")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(jsonAltaDesdePanel("Ana Lucía Torres Gutiérrez", "ROLE_TECNICO_NIVEL_2"))
+        .with(user("adminUser").roles("ADMIN"))
+        .with(csrf()))
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.success").value(true));
+  }
+
+  // POST /api/usuario — solo el admin puede dar de alta usuarios
+  @Test
+  void crearUsuario_noAdmin_retorna403() throws Exception {
+    mockMvc.perform(post("/api/usuario")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(jsonAltaDesdePanel("Ana Torres", "ROLE_ADMIN"))
+        .with(user("usuarioComun").roles("EMPLEADO"))
+        .with(csrf()))
+        .andExpect(status().isForbidden());
+  }
+
+  // POST /api/usuario — nombre por encima del máximo permitido (35)
+  @Test
+  void crearUsuario_nombreMuyLargo_retorna400() throws Exception {
+    mockMvc.perform(post("/api/usuario")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(jsonAltaDesdePanel("A".repeat(36), "ROLE_EMPLEADO"))
+        .with(user("adminUser").roles("ADMIN"))
+        .with(csrf()))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.errors.nombre").value("El nombre debe tener entre 3 y 35 caracteres"));
+  }
+
+  /* ---- Validaciones del alta (antes en /api/auth/register, ahora solo el admin) ---- */
+
+  private UsuarioDTO userDtoEjemplo() {
+    return new UsuarioDTO("jaime", "@Admin123", "Jaime Suarez", "jaimito@gmail.com", "ROLE_EMPLEADO",Area.CONTABILIDAD);
+  }
+
+  // Jaime — POST /api/usuario (alta por el admin)
+  @Test
+  void crearUsuario_retorna201YUsuarioCreado() throws Exception {
+
+    Usuario user = new Usuario();
+    user.setId(1L);
+    user.setUsername(this.userDtoEjemplo().getUsername());
+
+    UsuarioResponseDto userResponseDto = new UsuarioResponseDto();
+    userResponseDto.setUsername(user.getUsername());
+    Set<Role> role = new HashSet<>();
+    role.add(new Role(1L, "ROLE_EMPLEADO"));
+    userResponseDto.setRoles(role);
+
+    when(usuarioMapper.toEntity(any(UsuarioDTO.class))).thenReturn(user);
+    when(authService.register(any(Usuario.class), any(String.class))).thenReturn(user);
+    when(usuarioMapper.toResponseDto(any(Usuario.class))).thenReturn(userResponseDto);
+
+    mockMvc.perform(post("/api/usuario")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(userDtoEjemplo())) // el objeto que se envia al API
+        .with(user("adminUser").roles("ADMIN"))
+        .with(csrf()))
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.success").value(true))
+        .andExpect(jsonPath("$.message").value("Usuario Creado con exito!"))
+        .andExpect(jsonPath("$.dato.username").value("jaime"))
+        .andExpect(jsonPath("$.dato.roles[0].name").value("ROLE_EMPLEADO"));
+  }
+
+  // Jaime — POST /api/usuario (alta por el admin)
+  @Test
+  void crearUsuario_retorna400BadRequestNombreInvalido() throws Exception {
+
+    UsuarioDTO usuarioDtoRequest = this.userDtoEjemplo();
+    usuarioDtoRequest.setNombre("ja");
+
+    Usuario user = new Usuario();
+    user.setId(1L);
+    user.setUsername(this.userDtoEjemplo().getUsername());
+
+    UsuarioResponseDto userResponseDto = new UsuarioResponseDto();
+    userResponseDto.setUsername(user.getUsername());
+    Set<Role> role = new HashSet<>();
+    role.add(new Role(1L, "ROLE_EMPLEADO"));
+    userResponseDto.setRoles(role);
+
+    when(usuarioMapper.toEntity(any(UsuarioDTO.class))).thenReturn(user);
+    when(authService.register(any(Usuario.class), any(String.class))).thenReturn(user);
+    when(usuarioMapper.toResponseDto(any(Usuario.class))).thenReturn(userResponseDto);
+
+    mockMvc.perform(post("/api/usuario")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(usuarioDtoRequest))
+        .with(user("adminUser").roles("ADMIN"))
+        .with(csrf()))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error").value("Bad Request"))
+        .andExpect(jsonPath("$.errors.nombre").value("El nombre debe tener entre 3 y 35 caracteres"));
+  }
+
+  // Jaime — POST /api/usuario (alta por el admin)
+  @Test
+  void crearUsuario_retorna400BadRequestUsernameErroneo() throws Exception {
+
+    UsuarioDTO usuarioDtoRequest = this.userDtoEjemplo();
+    usuarioDtoRequest.setUsername("ch");
+
+    Usuario user = new Usuario();
+    user.setId(1L);
+    user.setUsername(this.userDtoEjemplo().getUsername());
+
+    UsuarioResponseDto userResponseDto = new UsuarioResponseDto();
+    userResponseDto.setUsername(user.getUsername());
+    Set<Role> role = new HashSet<>();
+    role.add(new Role(1L, "ROLE_EMPLEADO"));
+    userResponseDto.setRoles(role);
+
+    when(usuarioMapper.toEntity(any(UsuarioDTO.class))).thenReturn(user);
+    when(authService.register(any(Usuario.class), any(String.class))).thenReturn(user);
+    when(usuarioMapper.toResponseDto(any(Usuario.class))).thenReturn(userResponseDto);
+
+    mockMvc.perform(post("/api/usuario")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(usuarioDtoRequest))
+        .with(user("adminUser").roles("ADMIN"))
+        .with(csrf()))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error").value("Bad Request"))
+        .andExpect(jsonPath("$.errors.username").value("El username debe tener entre 3 y 20 caracteres"));
+  }
+
+  // Jaime — POST /api/usuario (alta por el admin)
+  @Test
+  void crearUsuario_retorna400BadRequestCorreoYPassword() throws Exception {
+
+    UsuarioDTO usuarioDtoRequest = this.userDtoEjemplo();
+    usuarioDtoRequest.setCorreo("jaimito.com.pe");
+    usuarioDtoRequest.setPassword("1234");
+
+    Usuario user = new Usuario();
+    user.setId(1L);
+    user.setUsername(this.userDtoEjemplo().getUsername());
+
+    UsuarioResponseDto userResponseDto = new UsuarioResponseDto();
+    userResponseDto.setUsername(user.getUsername());
+    Set<Role> role = new HashSet<>();
+    role.add(new Role(1L, "ROLE_EMPLEADO"));
+    userResponseDto.setRoles(role);
+
+    when(usuarioMapper.toEntity(any(UsuarioDTO.class))).thenReturn(user);
+    when(authService.register(any(Usuario.class), any(String.class))).thenReturn(user);
+    when(usuarioMapper.toResponseDto(any(Usuario.class))).thenReturn(userResponseDto);
+
+    mockMvc.perform(post("/api/usuario")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(usuarioDtoRequest))
+        .with(user("adminUser").roles("ADMIN"))
+        .with(csrf()))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error").value("Bad Request"))
+        .andExpect(jsonPath("$.errors.correo").value("El formato del correo electrónico no es válido"))
+        .andExpect(jsonPath("$.errors.password").value("La contraseña debe tener mínimo 6 caracteres, una mayúscula, una minúscula, un número y un carácter especial"));
+  }
+
+  // Jaime — POST /api/usuario (alta por el admin)
+  @Test
+  void crearUsuario_retorna400BadRequestCorreoExiste() throws Exception {
+
+    UsuarioDTO usuarioDtoRequest = this.userDtoEjemplo();
+    usuarioDtoRequest.setCorreo("jaimito@gmail.com");
+
+    Usuario user = new Usuario();
+    user.setId(1L);
+    user.setUsername(this.userDtoEjemplo().getUsername());
+
+    UsuarioResponseDto userResponseDto = new UsuarioResponseDto();
+    userResponseDto.setUsername(user.getUsername());
+    Set<Role> role = new HashSet<>();
+    role.add(new Role(1L, "ROLE_EMPLEADO"));
+    userResponseDto.setRoles(role);
+
+    when(usuarioMapper.toEntity(any(UsuarioDTO.class))).thenReturn(user);
+    when(authService.register(any(Usuario.class), any(String.class)))
+        .thenThrow(new IllegalArgumentException("El correo electrónico ya se encuentra registrado."));
+
+    mockMvc.perform(post("/api/usuario")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(usuarioDtoRequest))
+        .with(user("adminUser").roles("ADMIN"))
+        .with(csrf()))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error").value("Bad Request"))
+        .andExpect(jsonPath("$.message").value("El correo electrónico ya se encuentra registrado."));
   }
 }

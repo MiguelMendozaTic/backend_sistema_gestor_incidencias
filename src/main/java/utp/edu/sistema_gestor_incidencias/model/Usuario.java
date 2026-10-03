@@ -1,6 +1,8 @@
 package utp.edu.sistema_gestor_incidencias.model;
 
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotNull;
 import utp.edu.sistema_gestor_incidencias.enums.Area;
@@ -23,6 +25,7 @@ public class Usuario {
 	private String username;
 	@NotNull
 	@Column(name = "password_hash")
+	@JsonIgnore // nunca se envía en las respuestas JSON (incidencias, seguimientos, usuarios...)
 	private String passwordHash;
 	@NotNull
 	private String nombre;

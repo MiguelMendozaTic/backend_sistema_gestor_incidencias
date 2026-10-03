@@ -10,6 +10,7 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import utp.edu.sistema_gestor_incidencias.enums.Estado;
 import utp.edu.sistema_gestor_incidencias.model.Usuario;
 import utp.edu.sistema_gestor_incidencias.repository.UsuarioRepository;
 import org.springframework.security.core.GrantedAuthority;
@@ -40,7 +41,7 @@ public class JpaUserDetailsService implements UserDetailsService{
 		return new org.springframework.security.core.userdetails.User(
 				user.getUsername(),
 				user.getPasswordHash(),
-				true,
+				user.getEstado() == Estado.ACTIVO, // un usuario INACTIVO no puede iniciar sesión
 				true,
 				true,
 				true,

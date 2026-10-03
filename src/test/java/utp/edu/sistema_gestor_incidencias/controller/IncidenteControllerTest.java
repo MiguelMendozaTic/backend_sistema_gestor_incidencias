@@ -17,7 +17,9 @@ import utp.edu.sistema_gestor_incidencias.dto.incidencia.IncidenciaResponseDTO;
 import utp.edu.sistema_gestor_incidencias.enums.Area;
 import utp.edu.sistema_gestor_incidencias.enums.Estado;
 import utp.edu.sistema_gestor_incidencias.enums.EstadoIncidencia;
+import utp.edu.sistema_gestor_incidencias.exception.IncidenciaNotFoundException;
 import utp.edu.sistema_gestor_incidencias.exception.UsuarioNoEncontradoException;
+import org.springframework.security.access.AccessDeniedException;
 import utp.edu.sistema_gestor_incidencias.mappers.IncidenciaMapper;
 import utp.edu.sistema_gestor_incidencias.model.*;
 import utp.edu.sistema_gestor_incidencias.security.SpringSecurityConfig;
@@ -278,25 +280,40 @@ class IncidenteControllerTest {
   // Johan — GET /api/incidencia/{id}
   @Test
   void obtenerIncidencia_retorna200CuandoExiste() throws Exception {
-    when(incidenteService.obtenerIncidencia(1L)).thenReturn(Optional.of(incidenciaEjemplo()));
+    when(incidenteService.obtenerIncidenciaVisible(1L)).thenReturn(incidenciaEjemplo());
 
     mockMvc.perform(get("/api/incidencia/1")
         .with(user("admin").roles("ADMIN"))
         .with(csrf()))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.id").value(1L));
+        .andExpect(jsonPath("$.id").value(1L))
+        // El hash de la contraseña nunca debe salir en el JSON
+        .andExpect(jsonPath("$.usuario.passwordHash").doesNotExist());
   }
 
   @Test
   void obtenerIncidencia_retorna404CuandoNoExiste() throws Exception {
-    when(incidenteService.obtenerIncidencia(99L)).thenReturn(Optional.empty());
+    when(incidenteService.obtenerIncidenciaVisible(99L))
+        .thenThrow(new IncidenciaNotFoundException("Incidencia no encontrada con id: 99"));
 
     mockMvc.perform(get("/api/incidencia/99")
         .with(user("admin").roles("ADMIN"))
         .with(csrf()))
         .andExpect(status().isNotFound())
-        .andExpect(content().string("Incidencia no encontrada con id: 99"));
-    ;
+        .andExpect(jsonPath("$.message").value("Incidencia no encontrada con id: 99"));
+  }
+
+  // Un empleado no puede ver incidencias en las que no participa
+  @Test
+  void obtenerIncidencia_retorna403SiNoParticipa() throws Exception {
+    when(incidenteService.obtenerIncidenciaVisible(1L))
+        .thenThrow(new AccessDeniedException("No tienes acceso a esta incidencia"));
+
+    mockMvc.perform(get("/api/incidencia/1")
+        .with(user("otro").roles("EMPLEADO"))
+        .with(csrf()))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.message").value("No tienes acceso a esta incidencia"));
   }
 
 }

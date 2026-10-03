@@ -3,6 +3,7 @@ package utp.edu.sistema_gestor_incidencias.dto.usuario;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import utp.edu.sistema_gestor_incidencias.enums.Area;
 
@@ -13,10 +14,13 @@ public class UsuarioDTO {
   private String username;
 
   @NotBlank(message = "La contraseña es obligatoria")
-  @Size(min = 5, message = "La contraseña debe tener al menos 5 caracteres")
+  // 6-72 caracteres sin espacios, con al menos una mayúscula, una minúscula, un número y un carácter
+  // especial (ej. @Admin123). 72 = límite de BCrypt
+  @Pattern(regexp = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[^A-Za-z0-9\\s])\\S{6,72}$",
+      message = "La contraseña debe tener mínimo 6 caracteres, una mayúscula, una minúscula, un número y un carácter especial")
   private String password;
 
-  @Size(min = 3, max = 20, message = "El nombre debe tener entre 3 y 35 caracteres")
+  @Size(min = 3, max = 35, message = "El nombre debe tener entre 3 y 35 caracteres")
   @NotBlank(message = "El nombre no puede estar vacío")
   private String nombre;
 

@@ -42,7 +42,7 @@ public class AuthService {
 		usuario.setPasswordHash(passwordHash);
 
 		Set<Role> roles = new HashSet<Role>();
-		if (rol.length()>0) {
+		if (rol != null && !rol.isBlank()) {
 			Optional<Role> optionalRole = roleRepository.findByName(rol);
 			optionalRole.ifPresent(roles::add);
 		} else {

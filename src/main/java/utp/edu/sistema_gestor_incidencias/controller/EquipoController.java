@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.*;
 
 import jakarta.validation.Valid;
 import utp.edu.sistema_gestor_incidencias.dto.ApiResponse;
+import utp.edu.sistema_gestor_incidencias.enums.Estado;
 import utp.edu.sistema_gestor_incidencias.enums.TipoEquipo;
 import utp.edu.sistema_gestor_incidencias.model.Equipo;
 import utp.edu.sistema_gestor_incidencias.service.EquipoService;
@@ -70,13 +71,12 @@ public class EquipoController {
     public PagedModel<Equipo> listarEquiposPaginado(
             @RequestParam(value = "page", defaultValue = "0") int page,
             @RequestParam(value = "size", defaultValue = "10") int size,
-            @RequestParam(value = "texto", defaultValue = "") String texto) {
+            @RequestParam(value = "texto", defaultValue = "") String texto,
+            @RequestParam(value = "estado", required = false) Estado estado) {
         Pageable pageable = PageRequest.of(page, size);
-        if (texto.trim().length() >= 2) {
-            Page<Equipo> equipos = equipoService.buscarEquipos(texto, pageable);
-            return new PagedModel<>(equipos);
-        }
-        Page<Equipo> equipos = equipoService.listarEquiposPaginado(pageable);
+        // El texto filtra desde 2 caracteres, igual que en el resto de listados.
+        String filtro = texto.trim().length() >= 2 ? texto : "";
+        Page<Equipo> equipos = equipoService.buscarEquipos(filtro, estado, pageable);
         return new PagedModel<>(equipos);
     }
 

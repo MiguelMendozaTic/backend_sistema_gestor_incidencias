@@ -1,35 +1,27 @@
 package utp.edu.sistema_gestor_incidencias.controller;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import java.util.HashSet;
-import java.util.Set;
-
-import org.springframework.http.MediaType;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultMatcher;
 
-import utp.edu.sistema_gestor_incidencias.dto.usuario.UsuarioDTO;
-import utp.edu.sistema_gestor_incidencias.dto.usuario.UsuarioResponseDto;
-import utp.edu.sistema_gestor_incidencias.enums.Area;
-import utp.edu.sistema_gestor_incidencias.mappers.UsuarioMapper;
-import utp.edu.sistema_gestor_incidencias.model.Role;
-import utp.edu.sistema_gestor_incidencias.model.Usuario;
 import utp.edu.sistema_gestor_incidencias.security.SpringSecurityConfig;
 import utp.edu.sistema_gestor_incidencias.security.TokenJwtConfig;
 import utp.edu.sistema_gestor_incidencias.service.auth.AuthService;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 
+// Sin registro público: /api/auth solo expone las comprobaciones de disponibilidad para el admin
 @WebMvcTest(AuthController.class)
 @Import(SpringSecurityConfig.class)
 public class AuthControllerTest {
@@ -37,167 +29,55 @@ public class AuthControllerTest {
   @Autowired
   private MockMvc mockMvc;
 
-  private ObjectMapper objectMapper = new ObjectMapper();
-
   @MockitoBean
   private AuthService authService;
   @MockitoBean
-  private UsuarioMapper usuarioMapper;
-  @MockitoBean
   private TokenJwtConfig tokenJwtConfig;
 
-  private UsuarioDTO userDtoEjemplo() {
-    return new UsuarioDTO("jaime", "123456", "Jaime Suarez", "jaimito@gmail.com", "ROLE_EMPLEADO",Area.CONTABILIDAD);
+  private static ResultMatcher denegado() {
+    return result -> {
+      int s = result.getResponse().getStatus();
+      if (s != 401 && s != 403) throw new AssertionError("Esperaba 401/403 y fue " + s);
+    };
   }
 
-  // Jaime — POST /api/usuario
   @Test
-  void crearUsuario_retorna201YUsuarioCreado() throws Exception {
+  void existeUsername_admin_retorna200() throws Exception {
+    when(authService.existsByUsername("jaime")).thenReturn(true);
 
-    Usuario user = new Usuario();
-    user.setId(1L);
-    user.setUsername(this.userDtoEjemplo().getUsername());
-
-    UsuarioResponseDto userResponseDto = new UsuarioResponseDto();
-    userResponseDto.setUsername(user.getUsername());
-    Set<Role> role = new HashSet<>();
-    role.add(new Role(1L, "ROLE_EMPLEADO"));
-    userResponseDto.setRoles(role);
-
-    when(usuarioMapper.toEntity(any(UsuarioDTO.class))).thenReturn(user);
-    when(authService.register(any(Usuario.class), any(String.class))).thenReturn(user);
-    when(usuarioMapper.toResponseDto(any(Usuario.class))).thenReturn(userResponseDto);
-
-    mockMvc.perform(post("/api/auth/register")
-        .contentType(MediaType.APPLICATION_JSON)
-        .content(objectMapper.writeValueAsString(userDtoEjemplo())) // el objeto que se envia al API
-        .with(csrf()))
-        .andExpect(status().isCreated())
-        .andExpect(jsonPath("$.success").value(true))
-        .andExpect(jsonPath("$.message").value("Usuario Creado con exito!"))
-        .andExpect(jsonPath("$.dato.username").value("jaime"))
-        .andExpect(jsonPath("$.dato.roles[0].name").value("ROLE_EMPLEADO"));
+    mockMvc.perform(get("/api/auth/jaime").with(user("admin").roles("ADMIN")))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.exists").value(true));
   }
 
-  // Jaime — POST /api/usuario
   @Test
-  void crearUsuario_retorna400BadRequestNombreInvalido() throws Exception {
+  void existeCorreo_admin_retorna200() throws Exception {
+    when(authService.existsByCorreo("jaimito@gmail.com")).thenReturn(false);
 
-    UsuarioDTO usuarioDtoRequest = this.userDtoEjemplo();
-    usuarioDtoRequest.setNombre("ja");
-
-    Usuario user = new Usuario();
-    user.setId(1L);
-    user.setUsername(this.userDtoEjemplo().getUsername());
-
-    UsuarioResponseDto userResponseDto = new UsuarioResponseDto();
-    userResponseDto.setUsername(user.getUsername());
-    Set<Role> role = new HashSet<>();
-    role.add(new Role(1L, "ROLE_EMPLEADO"));
-    userResponseDto.setRoles(role);
-
-    when(usuarioMapper.toEntity(any(UsuarioDTO.class))).thenReturn(user);
-    when(authService.register(any(Usuario.class), any(String.class))).thenReturn(user);
-    when(usuarioMapper.toResponseDto(any(Usuario.class))).thenReturn(userResponseDto);
-
-    mockMvc.perform(post("/api/auth/register")
-        .contentType(MediaType.APPLICATION_JSON)
-        .content(objectMapper.writeValueAsString(usuarioDtoRequest))
-        .with(csrf()))
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.error").value("Bad Request"))
-        .andExpect(jsonPath("$.errors.nombre").value("El nombre debe tener entre 3 y 35 caracteres"));
+    mockMvc.perform(get("/api/auth/jaimito@gmail.com/validacion").with(user("admin").roles("ADMIN")))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.exists").value(false));
   }
 
-  // Jaime — POST /api/usuario
+  // Evita que cualquiera averigüe qué usuarios/correos existen
   @Test
-  void crearUsuario_retorna400BadRequestUsernameErroneo() throws Exception {
-
-    UsuarioDTO usuarioDtoRequest = this.userDtoEjemplo();
-    usuarioDtoRequest.setUsername("ch");
-
-    Usuario user = new Usuario();
-    user.setId(1L);
-    user.setUsername(this.userDtoEjemplo().getUsername());
-
-    UsuarioResponseDto userResponseDto = new UsuarioResponseDto();
-    userResponseDto.setUsername(user.getUsername());
-    Set<Role> role = new HashSet<>();
-    role.add(new Role(1L, "ROLE_EMPLEADO"));
-    userResponseDto.setRoles(role);
-
-    when(usuarioMapper.toEntity(any(UsuarioDTO.class))).thenReturn(user);
-    when(authService.register(any(Usuario.class), any(String.class))).thenReturn(user);
-    when(usuarioMapper.toResponseDto(any(Usuario.class))).thenReturn(userResponseDto);
-
-    mockMvc.perform(post("/api/auth/register")
-        .contentType(MediaType.APPLICATION_JSON)
-        .content(objectMapper.writeValueAsString(usuarioDtoRequest))
-        .with(csrf()))
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.error").value("Bad Request"))
-        .andExpect(jsonPath("$.errors.username").value("El username debe tener entre 3 y 20 caracteres"));
+  void existeUsername_sinSesion_denegado() throws Exception {
+    mockMvc.perform(get("/api/auth/jaime")).andExpect(denegado());
   }
 
-  // Jaime — POST /api/usuario
   @Test
-  void crearUsuario_retorna400BadRequestCorreoYPassword() throws Exception {
-
-    UsuarioDTO usuarioDtoRequest = this.userDtoEjemplo();
-    usuarioDtoRequest.setCorreo("jaimito.com.pe");
-    usuarioDtoRequest.setPassword("1234");
-
-    Usuario user = new Usuario();
-    user.setId(1L);
-    user.setUsername(this.userDtoEjemplo().getUsername());
-
-    UsuarioResponseDto userResponseDto = new UsuarioResponseDto();
-    userResponseDto.setUsername(user.getUsername());
-    Set<Role> role = new HashSet<>();
-    role.add(new Role(1L, "ROLE_EMPLEADO"));
-    userResponseDto.setRoles(role);
-
-    when(usuarioMapper.toEntity(any(UsuarioDTO.class))).thenReturn(user);
-    when(authService.register(any(Usuario.class), any(String.class))).thenReturn(user);
-    when(usuarioMapper.toResponseDto(any(Usuario.class))).thenReturn(userResponseDto);
-
-    mockMvc.perform(post("/api/auth/register")
-        .contentType(MediaType.APPLICATION_JSON)
-        .content(objectMapper.writeValueAsString(usuarioDtoRequest))
-        .with(csrf()))
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.error").value("Bad Request"))
-        .andExpect(jsonPath("$.errors.correo").value("El formato del correo electrónico no es válido"))
-        .andExpect(jsonPath("$.errors.password").value("La contraseña debe tener al menos 5 caracteres"));
+  void existeUsername_empleado_retorna403() throws Exception {
+    mockMvc.perform(get("/api/auth/jaime").with(user("emp").roles("EMPLEADO")))
+        .andExpect(status().isForbidden());
   }
 
-  // Jaime — POST /api/usuario
+  // El registro público ya no existe
   @Test
-  void crearUsuario_retorna400BadRequestCorreoExiste() throws Exception {
-
-    UsuarioDTO usuarioDtoRequest = this.userDtoEjemplo();
-    usuarioDtoRequest.setCorreo("jaimito@gmail.com");
-
-    Usuario user = new Usuario();
-    user.setId(1L);
-    user.setUsername(this.userDtoEjemplo().getUsername());
-
-    UsuarioResponseDto userResponseDto = new UsuarioResponseDto();
-    userResponseDto.setUsername(user.getUsername());
-    Set<Role> role = new HashSet<>();
-    role.add(new Role(1L, "ROLE_EMPLEADO"));
-    userResponseDto.setRoles(role);
-
-    when(usuarioMapper.toEntity(any(UsuarioDTO.class))).thenReturn(user);
-    when(authService.register(any(Usuario.class), any(String.class)))
-        .thenThrow(new IllegalArgumentException("El correo electrónico ya se encuentra registrado."));
-
+  void registroPublico_yaNoEstaDisponible() throws Exception {
     mockMvc.perform(post("/api/auth/register")
         .contentType(MediaType.APPLICATION_JSON)
-        .content(objectMapper.writeValueAsString(usuarioDtoRequest))
+        .content("{\"username\":\"nuevo\",\"password\":\"@Admin123\"}")
         .with(csrf()))
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.error").value("Bad Request"))
-        .andExpect(jsonPath("$.message").value("El correo electrónico ya se encuentra registrado."));
+        .andExpect(denegado());
   }
 }

@@ -10,18 +10,24 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PagedModel;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import utp.edu.sistema_gestor_incidencias.dto.ApiResponse;
 import utp.edu.sistema_gestor_incidencias.dto.role.RoleDTO;
+import utp.edu.sistema_gestor_incidencias.dto.usuario.SolicitanteDTO;
 import utp.edu.sistema_gestor_incidencias.dto.usuario.TecnicosDTO;
+import utp.edu.sistema_gestor_incidencias.dto.usuario.UsuarioDTO;
+import utp.edu.sistema_gestor_incidencias.enums.Area;
 import utp.edu.sistema_gestor_incidencias.dto.usuario.UsuarioResponseDto;
 import utp.edu.sistema_gestor_incidencias.mappers.UsuarioMapper;
 import utp.edu.sistema_gestor_incidencias.model.Usuario;
 import utp.edu.sistema_gestor_incidencias.service.IncidenciaService;
 import utp.edu.sistema_gestor_incidencias.service.UsuarioService;
+import utp.edu.sistema_gestor_incidencias.service.auth.AuthService;
 
 @RestController
 @RequestMapping("/api/usuario")
@@ -33,11 +39,25 @@ public class UsuarioController {
 
   private UsuarioMapper usuarioMapper;
 
-  UsuarioController(UsuarioService usuarioService,IncidenciaService incidenciaService, UsuarioMapper usuarioMapper) {
+  private AuthService authService;
+
+  UsuarioController(UsuarioService usuarioService,IncidenciaService incidenciaService, UsuarioMapper usuarioMapper,
+      AuthService authService) {
     this.usuarioService = usuarioService;
     this.usuarioMapper = usuarioMapper;
     this.incidenciaService = incidenciaService;
+    this.authService = authService;
+  }
 
+  // Alta de usuario por el administrador (permite elegir rol)
+  @PostMapping
+  public ResponseEntity<ApiResponse<UsuarioResponseDto>> crearUsuario(@Valid @RequestBody UsuarioDTO userDto) {
+    Usuario user = usuarioMapper.toEntity(userDto);
+    Usuario newUser = authService.register(user, userDto.getRol());
+    UsuarioResponseDto userResponseDto = usuarioMapper.toResponseDto(newUser);
+    ApiResponse<UsuarioResponseDto> response = new ApiResponse<UsuarioResponseDto>(
+        true, "Usuario Creado con exito!", 201, userResponseDto);
+    return ResponseEntity.status(HttpStatus.CREATED.value()).body(response);
   }
 
   @PutMapping("/{id}")
@@ -92,6 +112,17 @@ public class UsuarioController {
     return ResponseEntity.status(HttpStatus.OK.value()).body(response);
   }
 
+  /** Buscador de solicitantes: usuarios activos por nombre/username y área (máx. 20). */
+  @GetMapping("/solicitantes")
+  public ResponseEntity<List<SolicitanteDTO>> buscarSolicitantes(
+      @RequestParam(value = "texto", defaultValue = "") String texto,
+      @RequestParam(value = "area", required = false) Area area) {
+    List<SolicitanteDTO> lista = usuarioService.buscarSolicitantes(texto.trim(), area).stream()
+        .map(SolicitanteDTO::de)
+        .toList();
+    return ResponseEntity.ok(lista);
+  }
+
   @GetMapping("/{id}")
   public ResponseEntity<?> obtenerUsuario(@PathVariable Long id) {
     var user = usuarioService.obtenerUsuario(id);
@@ -101,7 +132,11 @@ public class UsuarioController {
   }
 
   @GetMapping("/{username}/username")
-  public ResponseEntity<?> obtenerUsuarioUsername(@PathVariable String username) {
+  public ResponseEntity<?> obtenerUsuarioUsername(@PathVariable String username, Authentication auth) {
+    // Cada usuario solo consulta su propio perfil; el admin puede consultar cualquiera.
+    boolean esAdmin = auth.getAuthorities().stream().anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
+    if (!esAdmin && !auth.getName().equals(username))
+      return ResponseEntity.status(HttpStatus.FORBIDDEN).body("No puedes consultar el perfil de otro usuario");
     var user = usuarioService.obtenerUsuarioPorUsername(username);
     if (user.isPresent())
       return ResponseEntity.ok(user.get());

@@ -15,23 +15,23 @@ public class Equipo {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @NotBlank
+    @NotBlank(message = "El nombre es obligatorio")
     private String nombre;
 
-    @NotBlank
+    // Si llega vacío, EquipoService lo genera (LAP-001, PC-002...).
     private String codigo;
 
     private String descripcion;
 
-    @NotNull
+    @NotNull(message = "El tipo es obligatorio")
     @Enumerated(EnumType.STRING)
     private TipoEquipo tipo;
 
-    @NotNull
+    @NotNull(message = "El área es obligatoria")
     @Enumerated(EnumType.STRING)
     private Area area;
 
-    @NotNull
+    // Lo asigna EquipoService: ACTIVO al crear, se conserva si no se envía al editar.
     @Enumerated(EnumType.STRING)
     private Estado estado;
 

@@ -28,6 +28,16 @@ public interface EquipoRepository extends JpaRepository<Equipo, Long> {
 
     boolean existsByCodigo(String codigo);
 
+    boolean existsByCodigoAndIdNot(String codigo, Long id);
+
+    /** Búsqueda por nombre o código, con filtro opcional de estado. */
+    @Query("SELECT e FROM Equipo e " +
+            "WHERE (:estado IS NULL OR e.estado = :estado) " +
+            "AND (:texto = '' OR LOWER(e.nombre) LIKE LOWER(CONCAT('%', :texto, '%')) " +
+            "     OR LOWER(e.codigo) LIKE LOWER(CONCAT('%', :texto, '%'))) " +
+            "ORDER BY e.nombre ASC")
+    Page<Equipo> buscar(@Param("texto") String texto, @Param("estado") Estado estado, Pageable pageable);
+
     /**
      * Obtiene el ultimo codigo generado para un prefijo de tipo.
      * Ejemplo: busca todos los codigos que inician con el prefijo y retorna el mayor.

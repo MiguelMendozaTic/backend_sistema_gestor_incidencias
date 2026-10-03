@@ -2,14 +2,15 @@ package utp.edu.sistema_gestor_incidencias.service;
 
 import java.util.Date;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 
+import utp.edu.sistema_gestor_incidencias.enums.EstadoIncidencia;
 import utp.edu.sistema_gestor_incidencias.exception.IncidenciaNotFoundException;
 import utp.edu.sistema_gestor_incidencias.exception.UsuarioNoEncontradoException;
 import utp.edu.sistema_gestor_incidencias.model.Incidencia;
@@ -17,6 +18,8 @@ import utp.edu.sistema_gestor_incidencias.model.Seguimiento;
 import utp.edu.sistema_gestor_incidencias.model.Usuario;
 import utp.edu.sistema_gestor_incidencias.repository.IncidenciaRepository;
 import utp.edu.sistema_gestor_incidencias.repository.SeguimientoRepository;
+import utp.edu.sistema_gestor_incidencias.notificacion.NotificacionIncidenciaEvent;
+import utp.edu.sistema_gestor_incidencias.notificacion.NotificacionIncidenciaEvent.TipoNotificacion;
 
 @Service
 public class SeguimientoService {
@@ -27,14 +30,44 @@ public class SeguimientoService {
 
   private UsuarioService usuarioService;
 
+  private ApplicationEventPublisher eventPublisher;
+
   public SeguimientoService(SeguimientoRepository seguimientoRepository, IncidenciaRepository incidenciaRepository,
-      UsuarioService usuarioService) {
+      UsuarioService usuarioService, ApplicationEventPublisher eventPublisher) {
     this.seguimientoRepository = seguimientoRepository;
     this.incidenciaRepository = incidenciaRepository;
     this.usuarioService = usuarioService;
+    this.eventPublisher = eventPublisher;
   }
 
+  /**
+   * Comentario escrito por un usuario: se guarda y se notifica al solicitante.
+   * Una incidencia CERRADA queda en solo lectura; únicamente el administrador puede comentar.
+   */
   public Seguimiento crearSeguimiento(Seguimiento seguimiento) {
+    Incidencia incidencia = incidenciaRepository.findById(seguimiento.getIncidencia().getId())
+        .orElseThrow(() -> new IncidenciaNotFoundException("Incidencia no encontrada"));
+    if (incidencia.getEstado() == EstadoIncidencia.CERRADO) {
+      Usuario usuario = usuarioService.obtenerUsuarioSession()
+          .orElseThrow(() -> new UsuarioNoEncontradoException("El usuario no se ha encontrado"));
+      boolean isAdmin = usuario.getRoles().stream().anyMatch(r -> r.getName().equals("ROLE_ADMIN"));
+      if (!isAdmin) {
+        throw new IllegalStateException(
+            "La incidencia está cerrada: no se pueden agregar comentarios. Solo el administrador puede reabrirla.");
+      }
+    }
+    Seguimiento guardado = registrarEventoSistema(seguimiento);
+    eventPublisher.publishEvent(NotificacionIncidenciaEvent.de(TipoNotificacion.SEGUIMIENTO,
+        guardado.getIncidencia(), guardado.getUsuario(), guardado.getFecha(),
+        "Comentario: " + guardado.getComentario()));
+    return guardado;
+  }
+
+  /**
+   * Guarda el seguimiento sin notificar. Lo usa IncidenciaService para el
+   * historial automático (creación, estado, técnico), que ya notifica por su cuenta.
+   */
+  public Seguimiento registrarEventoSistema(Seguimiento seguimiento) {
 
     Optional<Incidencia> incidencia = incidenciaRepository.findById(seguimiento.getIncidencia().getId());
     if (!incidencia.isPresent()) {
@@ -45,12 +78,10 @@ public class SeguimientoService {
     Usuario usuario = usuarioService.obtenerUsuarioSession()
         .orElseThrow(() -> new UsuarioNoEncontradoException("El usuario no se ha encontrado"));
     
-    Long idSession = usuario.getId();
-    var mismoUsuario = Objects.equals(idSession, incidenciaEncontrada.getUsuario().getId());
-    var misTecnico = incidenciaEncontrada.getTecnico() != null && Objects.equals(idSession, incidenciaEncontrada.getTecnico().getId());
+    // Quien la registró, su solicitante, el técnico asignado o el admin
     var isAdmin = usuario.getRoles().stream().anyMatch(r -> r.getName().equals("ROLE_ADMIN"));
 
-    if (mismoUsuario || misTecnico || isAdmin) {
+    if (incidenciaEncontrada.participa(usuario) || isAdmin) {
       seguimiento.setUsuario(usuario);
     }else{
       throw new AccessDeniedException("Usuario no autorizado para crear");
@@ -102,13 +133,10 @@ public class SeguimientoService {
     Usuario usuario = usuarioService.obtenerUsuarioSession()
         .orElseThrow(() -> new UsuarioNoEncontradoException("El usuario no se ha encontrado"));
 
-    Long idSession = usuario.getId();
-
-    var mismoUsuario = Objects.equals(idSession, incidencia.getUsuario().getId());
-    var misTecnico = incidencia.getTecnico() != null && Objects.equals(idSession, incidencia.getTecnico().getId());
+    // Quien la registró, su solicitante, el técnico asignado o el admin
     var isAdmin = usuario.getRoles().stream().anyMatch(r -> r.getName().equals("ROLE_ADMIN"));
 
-    if (mismoUsuario || misTecnico || isAdmin) {
+    if (incidencia.participa(usuario) || isAdmin) {
       return seguimientoRepository.findByIncidencia(incidencia);
     }
 

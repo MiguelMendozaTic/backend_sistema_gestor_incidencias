@@ -75,12 +75,19 @@ public class EquipoService {
     public Equipo modificarEquipo(Long id, Equipo datos) {
         Equipo equipo = equipoRepository.findById(id)
                 .orElseThrow(() -> new IncidenciaNotFoundException("Equipo no encontrado con id: " + id));
+        if (datos.getCodigo() != null && !datos.getCodigo().isBlank()) {
+            if (equipoRepository.existsByCodigoAndIdNot(datos.getCodigo(), id)) {
+                throw new IllegalArgumentException("Ya existe un equipo con el código: " + datos.getCodigo());
+            }
+            equipo.setCodigo(datos.getCodigo());
+        }
         equipo.setNombre(datos.getNombre());
-        equipo.setCodigo(datos.getCodigo());
         equipo.setDescripcion(datos.getDescripcion());
         equipo.setTipo(datos.getTipo());
         equipo.setArea(datos.getArea());
-        equipo.setEstado(datos.getEstado());
+        if (datos.getEstado() != null) {
+            equipo.setEstado(datos.getEstado());
+        }
         return equipoRepository.save(equipo);
     }
 
@@ -110,6 +117,10 @@ public class EquipoService {
     public Page<Equipo> buscarEquipos(String texto, Pageable pageable) {
         return equipoRepository.findByNombreContainingIgnoreCaseOrCodigoContainingIgnoreCase(
                 texto, texto, pageable);
+    }
+
+    public Page<Equipo> buscarEquipos(String texto, Estado estado, Pageable pageable) {
+        return equipoRepository.buscar(texto.trim(), estado, pageable);
     }
 
     public long contarPorTipo(TipoEquipo tipo) {

@@ -134,10 +134,8 @@ public class IncidenciaController {
 
   @GetMapping("/{id}")
   public ResponseEntity<?> obtenerIncidencia(@PathVariable Long id) {
-    var incidencia = incidenteService.obtenerIncidencia(id);
-    if (incidencia.isPresent())
-      return ResponseEntity.ok(incidencia.get());
-    return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Incidencia no encontrada con id: " + id);
+    // 404 si no existe, 403 si el usuario no participa en ella (GlobalExceptionHandler)
+    return ResponseEntity.ok(incidenteService.obtenerIncidenciaVisible(id));
   }
 
   @PostMapping("/actualizarEstado")

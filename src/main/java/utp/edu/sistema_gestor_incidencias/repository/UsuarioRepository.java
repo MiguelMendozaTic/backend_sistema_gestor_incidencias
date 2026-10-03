@@ -15,6 +15,8 @@ import utp.edu.sistema_gestor_incidencias.model.Usuario;
 public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
 	Optional<Usuario> findByUsername(String username);
 
+	Optional<Usuario> findByCorreo(String correo);
+
 	boolean existsByCorreo(String correo);
 
 	boolean existsByUsername(String username);
@@ -32,7 +34,16 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
 	List<Usuario> findTecnicosDisponibles(@Param("nombreRol") String nombreRol);
 
 	// Total de usuarios
-	long countAllByEstado(Estado estado); // Si solo quieres activos, usa "ACTIVO"
+	long countAllByEstado(Estado estado);
+
+	/** Usuarios activos por nombre o username, con filtro opcional de área (selector de solicitante). */
+	@Query("SELECT u FROM Usuario u WHERE u.estado = utp.edu.sistema_gestor_incidencias.enums.Estado.ACTIVO " +
+			"AND (:area IS NULL OR u.area = :area) " +
+			"AND (:texto = '' OR LOWER(u.nombre) LIKE LOWER(CONCAT('%', :texto, '%')) " +
+			"     OR LOWER(u.username) LIKE LOWER(CONCAT('%', :texto, '%'))) " +
+			"ORDER BY u.nombre ASC")
+	List<Usuario> buscarSolicitantes(@Param("texto") String texto,
+			@Param("area") utp.edu.sistema_gestor_incidencias.enums.Area area, Pageable pageable); // Si solo quieres activos, usa "ACTIVO"
 
 	// Agrupar por área (para las burbujas del dashboard)
 	@Query("SELECT u.area, COUNT(u) FROM Usuario u GROUP BY u.area")
