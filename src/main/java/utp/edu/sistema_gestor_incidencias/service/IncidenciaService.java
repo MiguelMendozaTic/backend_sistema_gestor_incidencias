@@ -235,18 +235,18 @@ public class IncidenciaService {
 	}
 
 	// Misma transacción = misma instancia por id, así distinct() elimina los repetidos
-	@org.springframework.transaction.annotation.Transactional(readOnly = true)
-	public List<Incidencia> misIncidencias() {
-		var usuario = usuarioService.obtenerUsuarioSession()
-				.orElseThrow(() -> new UsuarioNoEncontradoException("El usuario no encontrado"));
-		List<Incidencia> comoUsuario = incidenciaRepository.findByUsuario(usuario);
-		List<Incidencia> comoTecnico = incidenciaRepository.findByTecnico(usuario);
-		List<Incidencia> comoSolicitante = incidenciaRepository.findBySolicitante(usuario);
-		return Stream.of(comoUsuario, comoTecnico, comoSolicitante)
-				.flatMap(List::stream)
-				.distinct()
-				.collect(Collectors.toList());
-	}
+@org.springframework.transaction.annotation.Transactional(readOnly = true)
+public List<Incidencia> misIncidencias() {
+    var usuario = usuarioService.obtenerUsuarioSession()
+            .orElseThrow(() -> new UsuarioNoEncontradoException("El usuario no encontrado"));
+    List<Incidencia> comoUsuario = incidenciaRepository.findByUsuario(usuario);
+    List<Incidencia> comoTecnico = incidenciaRepository.findByTecnico(usuario);
+    List<Incidencia> comoSolicitante = incidenciaRepository.findBySolicitante(usuario);
+    return Stream.of(comoUsuario, comoTecnico, comoSolicitante)
+            .flatMap(lista -> lista.stream())
+            .distinct()
+            .collect(Collectors.toList());
+}
 
 	public Page<Incidencia> misIncidenciasPage(Pageable pageable) {
 		var usuario = usuarioService.obtenerUsuarioSession()
