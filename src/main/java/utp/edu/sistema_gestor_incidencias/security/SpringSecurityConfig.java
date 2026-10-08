@@ -50,13 +50,16 @@ public class SpringSecurityConfig {
 		AuthenticationManager manager = authenticationConfiguration.getAuthenticationManager();
 
 		JwtAuthenticationFilter jwtAuthenticationFilter = new JwtAuthenticationFilter(manager, tokenJwtConfig);
-
+		jwtAuthenticationFilter.setFilterProcessesUrl("/api/login");
 		JwtValidationFilter jwtValidationFilter = new JwtValidationFilter(manager, tokenJwtConfig);
 
 		return httpSecurity
 				.cors(cors -> cors.configurationSource(corsConfigurationSource()))
 				.csrf(AbstractHttpConfigurer::disable)
 				.authorizeHttpRequests((authorize) -> authorize
+						// El login DEBE ser público (nadie tiene rol ADMIN antes de autenticarse)
+						.requestMatchers(HttpMethod.POST, "/api/login").permitAll()
+
 						// Sin registro público: las comprobaciones de usuario/correo libres son del formulario de alta del admin
 						.requestMatchers("/api/auth/**").hasRole("ADMIN")
 
