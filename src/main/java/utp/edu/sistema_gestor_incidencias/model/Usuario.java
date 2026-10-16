@@ -1,6 +1,5 @@
 package utp.edu.sistema_gestor_incidencias.model;
 
-
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import jakarta.validation.constraints.Email;
@@ -13,25 +12,25 @@ import java.util.Set;
 
 import jakarta.persistence.*;
 
-
 @Entity
 @Table(name = "usuarios")
 public class Usuario {
 	@Id
-	@GeneratedValue(strategy = GenerationType.IDENTITY) 
+	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	private Long id;
 	@NotNull
-    @Column(name="username", nullable = false, unique = true)
+	@Column(name = "username", nullable = false, unique = true)
 	private String username;
 	@NotNull
 	@Column(name = "password_hash")
-	@JsonIgnore // nunca se envía en las respuestas JSON (incidencias, seguimientos, usuarios...)
+	@JsonIgnore // nunca se envía en las respuestas JSON (incidencias, seguimientos,
+				// usuarios...)
 	private String passwordHash;
 	@NotNull
 	private String nombre;
 	@NotNull
 	@Email
-    @Column(name="correo", nullable = false, unique = true)
+	@Column(name = "correo", nullable = false, unique = true)
 	private String correo;
 	@NotNull
 	@Enumerated(EnumType.STRING)
@@ -39,21 +38,18 @@ public class Usuario {
 	@NotNull
 	@Enumerated(EnumType.STRING)
 	private Area area;
-	
-	@ManyToMany(fetch = FetchType.EAGER, cascade= {CascadeType.MERGE, CascadeType.PERSIST})
-	@JoinTable(
-			name = "users_roles",
-			joinColumns = @JoinColumn(name = "user_id"),
-			inverseJoinColumns = @JoinColumn(name = "role_id"),
-			uniqueConstraints = @UniqueConstraint(columnNames = {"user_id" , "role_id"})
-	)
+
+	@ManyToMany(fetch = FetchType.EAGER, cascade = { CascadeType.MERGE })
+	@JoinTable(name = "users_roles", joinColumns = @JoinColumn(name = "user_id"), inverseJoinColumns = @JoinColumn(name = "role_id"), uniqueConstraints = @UniqueConstraint(columnNames = {
+			"user_id", "role_id" }))
 	private Set<Role> roles;
-	
+
 	public Usuario() {
 		roles = new HashSet<>();
 	}
 
-	public Usuario(Long id, @NotNull String username,String passwordHash, @NotNull String nombre, @NotNull @Email String correo,
+	public Usuario(Long id, @NotNull String username, String passwordHash, @NotNull String nombre,
+			@NotNull @Email String correo,
 			@NotNull Estado estado, @NotNull Area area, Set<Role> roles) {
 		this.id = id;
 		this.username = username;
@@ -129,8 +125,8 @@ public class Usuario {
 		this.passwordHash = passwordHash;
 	}
 
-	public void addRole(Role role){
+	public void addRole(Role role) {
 		this.roles.add(role);
 	}
-	
+
 }
