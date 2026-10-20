@@ -17,6 +17,7 @@ public record NotificacionIncidenciaEvent(
 		String ticket,
 		String titulo,
 		String estado,
+		String prioridad,
 		String solicitanteNombre,
 		String solicitanteCorreo,
 		String tecnico,
@@ -62,13 +63,16 @@ public record NotificacionIncidenciaEvent(
 				? i.getEquipo().getCodigo() + " · " + i.getEquipo().getNombre()
 				: "No especificado";
 		String autorNombre = autor != null ? autor.getNombre() + " (@" + autor.getUsername() + ")" : "Sistema";
-		// Incidencias anteriores a este cambio no tienen solicitante: se avisa a quien la registró.
+		// Incidencias anteriores a este cambio no tienen solicitante: se avisa a quien
+		// la registró.
 		Usuario solicitante = i.getSolicitante() != null ? i.getSolicitante() : i.getUsuario();
+		String prioridadStr = i.getPrioridad() != null ? i.getPrioridad().name() : "MEDIA";
 		return new NotificacionIncidenciaEvent(
 				tipo,
 				ticketKey(i.getId()),
 				i.getTitulo(),
 				i.getEstado() != null ? i.getEstado().name() : "",
+				prioridadStr,
 				solicitante != null ? solicitante.getNombre() : null,
 				solicitante != null ? solicitante.getCorreo() : null,
 				i.getTecnico() != null ? i.getTecnico().getNombre() : "Sin asignar",
@@ -89,6 +93,7 @@ public record NotificacionIncidenciaEvent(
 		sb.append(tipo.getAsunto()).append(" en el ticket ").append(ticket).append(".\n\n");
 		sb.append("Ticket: ").append(ticket).append('\n');
 		sb.append("Resumen: ").append(titulo).append('\n');
+		sb.append("Prioridad: ").append(prioridad != null ? prioridad : "MEDIA").append('\n');
 		sb.append("Estado actual: ").append(estado).append('\n');
 		sb.append("Técnico asignado: ").append(tecnico).append('\n');
 		sb.append("Equipo: ").append(equipo).append('\n');

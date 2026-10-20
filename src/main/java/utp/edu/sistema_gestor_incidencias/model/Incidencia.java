@@ -13,6 +13,7 @@ import jakarta.validation.constraints.NotNull;
 import utp.edu.sistema_gestor_incidencias.enums.EstadoIncidencia;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import utp.edu.sistema_gestor_incidencias.enums.Prioridad;
 
 @Entity
 @Table(name = "incidencias")
@@ -27,6 +28,8 @@ public class Incidencia {
 	@NotNull
 	@Enumerated(EnumType.STRING)
 	private EstadoIncidencia estado;
+	@Enumerated(EnumType.STRING)
+	private Prioridad prioridad = Prioridad.MEDIA;
 	@NotNull
 	@ManyToOne
 	@JoinColumn(name = "usuario_id")
@@ -38,7 +41,10 @@ public class Incidencia {
 	@ManyToOne
 	@JoinColumn(name = "equipo_id")
 	private Equipo equipo;
-	/** Usuario que solicita la atención; recibe las notificaciones en su correo registrado. */
+	/**
+	 * Usuario que solicita la atención; recibe las notificaciones en su correo
+	 * registrado.
+	 */
 	@ManyToOne
 	@JoinColumn(name = "solicitante_id")
 	private Usuario solicitante;
@@ -49,6 +55,7 @@ public class Incidencia {
 	private Usuario tecnicoCierre;
 
 	public Incidencia() {
+		this.prioridad = Prioridad.MEDIA;
 	}
 
 	public Incidencia(Long id, String titulo, String descripcion, EstadoIncidencia estado, Usuario usuario,
@@ -61,12 +68,28 @@ public class Incidencia {
 		this.usuario = usuario;
 		this.tecnico = tecnico;
 		this.fechaCreacion = fechaCreacion;
+		this.prioridad = Prioridad.MEDIA;
 	}
 
 	public Incidencia(Long id, String titulo, String descripcion, EstadoIncidencia estado, Usuario usuario,
 			Date fechaCreacion, Usuario tecnico, Equipo equipo) {
 		this(id, titulo, descripcion, estado, usuario, fechaCreacion, tecnico);
 		this.equipo = equipo;
+		this.prioridad = Prioridad.MEDIA;
+	}
+
+	public Incidencia(Long id, String titulo, String descripcion, EstadoIncidencia estado, Usuario usuario,
+			Date fechaCreacion, Usuario tecnico, Equipo equipo, Prioridad prioridad) {
+		this(id, titulo, descripcion, estado, usuario, fechaCreacion, tecnico, equipo);
+		this.prioridad = prioridad != null ? prioridad : Prioridad.MEDIA;
+	}
+
+	public Prioridad getPrioridad() {
+		return prioridad != null ? prioridad : Prioridad.MEDIA;
+	}
+
+	public void setPrioridad(Prioridad prioridad) {
+		this.prioridad = prioridad != null ? prioridad : Prioridad.MEDIA;
 	}
 
 	public Date getFechaCreacion() {
@@ -157,9 +180,12 @@ public class Incidencia {
 		this.tecnicoCierre = tecnicoCierre;
 	}
 
-	/** true si el usuario la registró, es su solicitante o es el técnico asignado. */
+	/**
+	 * true si el usuario la registró, es su solicitante o es el técnico asignado.
+	 */
 	public boolean participa(Usuario u) {
-		if (u == null || u.getId() == null) return false;
+		if (u == null || u.getId() == null)
+			return false;
 		return mismoId(usuario, u) || mismoId(solicitante, u) || mismoId(tecnico, u);
 	}
 

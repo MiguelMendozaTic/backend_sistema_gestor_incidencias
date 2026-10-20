@@ -19,6 +19,7 @@ import utp.edu.sistema_gestor_incidencias.dto.incidencia.IncidenciaRequestTecnic
 import utp.edu.sistema_gestor_incidencias.dto.usuario.TecnicosDTO;
 import utp.edu.sistema_gestor_incidencias.enums.Estado;
 import utp.edu.sistema_gestor_incidencias.enums.EstadoIncidencia;
+import utp.edu.sistema_gestor_incidencias.enums.Prioridad;
 import utp.edu.sistema_gestor_incidencias.exception.IncidenciaNotFoundException;
 import utp.edu.sistema_gestor_incidencias.exception.UsuarioNoEncontradoException;
 import utp.edu.sistema_gestor_incidencias.model.Equipo;
@@ -53,13 +54,17 @@ public class IncidenciaService {
 		this.eventPublisher = eventPublisher;
 	}
 
-	/** Publica la notificación; se envía por correo cuando la transacción hace commit. */
+	/**
+	 * Publica la notificación; se envía por correo cuando la transacción hace
+	 * commit.
+	 */
 	private void notificar(TipoNotificacion tipo, Incidencia incidencia, Usuario autor, Date fecha, String detalle) {
 		eventPublisher.publishEvent(NotificacionIncidenciaEvent.de(tipo, incidencia, autor, fecha, detalle));
 	}
 
 	/**
-	 * Registra fecha/hora y quién cerró al pasar a CERRADO; si se reabre, los limpia.
+	 * Registra fecha/hora y quién cerró al pasar a CERRADO; si se reabre, los
+	 * limpia.
 	 * Devuelve true si la incidencia se acaba de cerrar.
 	 */
 	private boolean aplicarCierre(Incidencia incidencia, EstadoIncidencia estadoAnterior, Usuario autor, Date fecha) {
@@ -112,7 +117,8 @@ public class IncidenciaService {
 		// Vincular equipo si se proporcionó
 		if (dto.getEquipoId() != null) {
 			Equipo equipo = equipoRepository.findById(dto.getEquipoId())
-					.orElseThrow(() -> new IllegalArgumentException("Equipo no encontrado con id: " + dto.getEquipoId()));
+					.orElseThrow(
+							() -> new IllegalArgumentException("Equipo no encontrado con id: " + dto.getEquipoId()));
 			incidencia.setEquipo(equipo);
 		}
 
@@ -120,9 +126,11 @@ public class IncidenciaService {
 		incidencia.setFechaCreacion(fechaActual);
 		incidencia.setTitulo(dto.getTitulo());
 		incidencia.setDescripcion(dto.getDescripcion());
+		incidencia.setPrioridad(dto.getPrioridad() != null ? dto.getPrioridad() : Prioridad.MEDIA);
 		incidencia.setUsuario(usuario);
 		incidencia.setEstado(EstadoIncidencia.PENDIENTE);
-		// Por defecto el solicitante es quien registra la incidencia. Solo el admin puede
+		// Por defecto el solicitante es quien registra la incidencia. Solo el admin
+		// puede
 		// registrarla a nombre de otro usuario; para el resto se ignora solicitanteId.
 		incidencia.setSolicitante(esAdmin(usuario) && dto.getSolicitanteId() != null
 				? buscarSolicitante(dto.getSolicitanteId())
@@ -157,6 +165,9 @@ public class IncidenciaService {
 			i.setTitulo(datosNuevos.getTitulo());
 			i.setDescripcion(datosNuevos.getDescripcion());
 			i.setEstado(datosNuevos.getEstado());
+			if (datosNuevos.getPrioridad() != null) {
+				i.setPrioridad(datosNuevos.getPrioridad());
+			}
 			i.setTecnico(datosNuevos.getTecnico());
 			// El solicitante llega como { "id": n }; si no llega se conserva el actual.
 			if (datosNuevos.getSolicitante() != null && datosNuevos.getSolicitante().getId() != null) {
@@ -180,7 +191,8 @@ public class IncidenciaService {
 			seguimiento.setIncidencia(actualizada);
 			seguimiento.setEstado(Estado.ACTIVO);
 			seguimiento.setComentario("Incidencia editada por " + usuarioNombre
-					+ (equipo != null ? " | Equipo afectado: " + equipo.getNombre() + " (" + equipo.getCodigo() + ")" : ""));
+					+ (equipo != null ? " | Equipo afectado: " + equipo.getNombre() + " (" + equipo.getCodigo() + ")"
+							: ""));
 			seguimientoService.registrarEventoSistema(seguimiento);
 
 			if (seCerro) {
@@ -208,8 +220,10 @@ public class IncidenciaService {
 	}
 
 	/**
-	 * Detalle de una incidencia para el usuario en sesión: el admin ve todas; el resto solo
-	 * aquellas que registró, de las que es solicitante o que tiene asignadas como técnico.
+	 * Detalle de una incidencia para el usuario en sesión: el admin ve todas; el
+	 * resto solo
+	 * aquellas que registró, de las que es solicitante o que tiene asignadas como
+	 * técnico.
 	 */
 	public Incidencia obtenerIncidenciaVisible(Long id) {
 		Incidencia incidencia = incidenciaRepository.findById(id)
@@ -234,19 +248,20 @@ public class IncidenciaService {
 		return incidenciaRepository.findAllByOrderByFechaCreacionDesc(pageable);
 	}
 
-	// Misma transacción = misma instancia por id, así distinct() elimina los repetidos
-@org.springframework.transaction.annotation.Transactional(readOnly = true)
-public List<Incidencia> misIncidencias() {
-    var usuario = usuarioService.obtenerUsuarioSession()
-            .orElseThrow(() -> new UsuarioNoEncontradoException("El usuario no encontrado"));
-    List<Incidencia> comoUsuario = incidenciaRepository.findByUsuario(usuario);
-    List<Incidencia> comoTecnico = incidenciaRepository.findByTecnico(usuario);
-    List<Incidencia> comoSolicitante = incidenciaRepository.findBySolicitante(usuario);
-    return Stream.of(comoUsuario, comoTecnico, comoSolicitante)
-            .flatMap(lista -> lista.stream())
-            .distinct()
-            .collect(Collectors.toList());
-}
+	// Misma transacción = misma instancia por id, así distinct() elimina los
+	// repetidos
+	@org.springframework.transaction.annotation.Transactional(readOnly = true)
+	public List<Incidencia> misIncidencias() {
+		var usuario = usuarioService.obtenerUsuarioSession()
+				.orElseThrow(() -> new UsuarioNoEncontradoException("El usuario no encontrado"));
+		List<Incidencia> comoUsuario = incidenciaRepository.findByUsuario(usuario);
+		List<Incidencia> comoTecnico = incidenciaRepository.findByTecnico(usuario);
+		List<Incidencia> comoSolicitante = incidenciaRepository.findBySolicitante(usuario);
+		return Stream.of(comoUsuario, comoTecnico, comoSolicitante)
+				.flatMap(lista -> lista.stream())
+				.distinct()
+				.collect(Collectors.toList());
+	}
 
 	public Page<Incidencia> misIncidenciasPage(Pageable pageable) {
 		var usuario = usuarioService.obtenerUsuarioSession()
@@ -269,7 +284,8 @@ public List<Incidencia> misIncidencias() {
 	@org.springframework.transaction.annotation.Transactional
 	public Incidencia modificarEstado(EstadoIncidenciaRequest est) {
 		Incidencia incidencia = incidenciaRepository.findById(est.getIdIncidencia())
-				.orElseThrow(() -> new IncidenciaNotFoundException("Incidencia no encontrada con id: " + est.getIdIncidencia()));
+				.orElseThrow(() -> new IncidenciaNotFoundException(
+						"Incidencia no encontrada con id: " + est.getIdIncidencia()));
 		EstadoIncidencia estadoAnterior = incidencia.getEstado();
 		Usuario usuarioLogeado = usuarioService.obtenerUsuarioSession().orElse(null);
 		boolean isAdmin = esAdmin(usuarioLogeado);
@@ -277,7 +293,8 @@ public List<Incidencia> misIncidencias() {
 		if (!isAdmin && !incidencia.esTecnicoAsignado(usuarioLogeado)) {
 			throw new AccessDeniedException("Solo el técnico asignado o el administrador pueden cambiar el estado");
 		}
-		// Una incidencia cerrada queda bloqueada: solo el administrador puede reabrirla.
+		// Una incidencia cerrada queda bloqueada: solo el administrador puede
+		// reabrirla.
 		if (estadoAnterior == EstadoIncidencia.CERRADO && !isAdmin) {
 			throw new IllegalArgumentException(
 					"La incidencia está cerrada. Solo el administrador puede reabrirla o modificarla.");
@@ -292,7 +309,8 @@ public List<Incidencia> misIncidencias() {
 		Seguimiento seguimiento = new Seguimiento();
 		seguimiento.setIncidencia(updateIncidencia);
 		seguimiento.setEstado(Estado.ACTIVO);
-		seguimiento.setComentario("Estado de incidencia actualizado de " + estadoAnterior + " a " + est.getEstado() + " por " + usuarioNombre);
+		seguimiento.setComentario("Estado de incidencia actualizado de " + estadoAnterior + " a " + est.getEstado()
+				+ " por " + usuarioNombre);
 
 		seguimientoService.registrarEventoSistema(seguimiento);
 
@@ -332,13 +350,13 @@ public List<Incidencia> misIncidencias() {
 		var updateIncidencia = incidenciaRepository.save(incidencia);
 
 		Usuario usuarioLogeado = usuarioService.obtenerUsuarioSession()
-        .orElseThrow(() -> new UsuarioNoEncontradoException("El usuario no se ha encontrado"));
-   
+				.orElseThrow(() -> new UsuarioNoEncontradoException("El usuario no se ha encontrado"));
 
 		Seguimiento seguimiento = new Seguimiento();
 		seguimiento.setIncidencia(updateIncidencia);
 		seguimiento.setEstado(Estado.ACTIVO);
-		seguimiento.setComentario("Incidencia modificada por " + usuarioLogeado.getUsername().toUpperCase() + " se asigno al tecnico "+ tecnico.getUsername().toUpperCase());
+		seguimiento.setComentario("Incidencia modificada por " + usuarioLogeado.getUsername().toUpperCase()
+				+ " se asigno al tecnico " + tecnico.getUsername().toUpperCase());
 
 		seguimientoService.registrarEventoSistema(seguimiento);
 

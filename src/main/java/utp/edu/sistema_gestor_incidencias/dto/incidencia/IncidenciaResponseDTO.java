@@ -1,26 +1,40 @@
 package utp.edu.sistema_gestor_incidencias.dto.incidencia;
 
 import utp.edu.sistema_gestor_incidencias.enums.EstadoIncidencia;
+import utp.edu.sistema_gestor_incidencias.enums.Prioridad;
 
 public class IncidenciaResponseDTO {
 	private Long id;
-    private String titulo;
-    private EstadoIncidencia  estado;
-    private String descripcion;
-    private Long usuarioId;
-    private Long tecnicoId;
+	private String titulo;
+	private EstadoIncidencia estado;
+	private Prioridad prioridad;
+	private String descripcion;
+	private Long usuarioId;
+	private Long tecnicoId;
 
-    public IncidenciaResponseDTO() {}
-    
+	public IncidenciaResponseDTO() {
+	}
+
+	public Prioridad getPrioridad() {
+		return prioridad;
+	}
+
+	public void setPrioridad(Prioridad prioridad) {
+		this.prioridad = prioridad;
+	}
+
 	public Long getId() {
 		return id;
 	}
+
 	public void setId(Long id) {
 		this.id = id;
 	}
+
 	public String getTitulo() {
 		return titulo;
 	}
+
 	public void setTitulo(String titulo) {
 		this.titulo = titulo;
 	}
@@ -28,18 +42,23 @@ public class IncidenciaResponseDTO {
 	public String getDescripcion() {
 		return descripcion;
 	}
+
 	public void setDescripcion(String descripcion) {
 		this.descripcion = descripcion;
 	}
+
 	public Long getUsuarioId() {
 		return usuarioId;
 	}
+
 	public void setUsuarioId(Long usuarioId) {
 		this.usuarioId = usuarioId;
 	}
+
 	public Long getTecnicoId() {
 		return tecnicoId;
 	}
+
 	public void setTecnicoId(Long tecnicoId) {
 		this.tecnicoId = tecnicoId;
 	}
@@ -51,7 +70,5 @@ public class IncidenciaResponseDTO {
 	public void setEstado(EstadoIncidencia estado) {
 		this.estado = estado;
 	}
-    
-    
-    
+
 }

@@ -23,6 +23,7 @@ import utp.edu.sistema_gestor_incidencias.dto.incidencia.IncidenciaDTO;
 import utp.edu.sistema_gestor_incidencias.enums.Area;
 import utp.edu.sistema_gestor_incidencias.enums.Estado;
 import utp.edu.sistema_gestor_incidencias.enums.EstadoIncidencia;
+import utp.edu.sistema_gestor_incidencias.enums.Prioridad;
 import utp.edu.sistema_gestor_incidencias.model.Incidencia;
 import utp.edu.sistema_gestor_incidencias.model.Role;
 import utp.edu.sistema_gestor_incidencias.model.Usuario;
@@ -97,6 +98,32 @@ class IncidenciaServiceTest {
     Incidencia creada = service.crearIncidencia(dtoConSolicitante(null));
 
     assertSame(admin, creada.getSolicitante());
+  }
+
+  @Test
+  void crearIncidencia_asignaPrioridadEspecificada() {
+    Usuario empleado = usuario(1L, "empleado", "ROLE_EMPLEADO");
+    when(usuarioService.obtenerUsuarioSession()).thenReturn(Optional.of(empleado));
+
+    IncidenciaDTO dto = dtoConSolicitante(null);
+    dto.setPrioridad(Prioridad.ALTA);
+
+    Incidencia creada = service.crearIncidencia(dto);
+
+    org.junit.jupiter.api.Assertions.assertEquals(Prioridad.ALTA, creada.getPrioridad());
+  }
+
+  @Test
+  void crearIncidencia_sinPrioridad_asignaPrioridadMediaPorDefecto() {
+    Usuario empleado = usuario(1L, "empleado", "ROLE_EMPLEADO");
+    when(usuarioService.obtenerUsuarioSession()).thenReturn(Optional.of(empleado));
+
+    IncidenciaDTO dto = dtoConSolicitante(null);
+    dto.setPrioridad(null);
+
+    Incidencia creada = service.crearIncidencia(dto);
+
+    org.junit.jupiter.api.Assertions.assertEquals(Prioridad.MEDIA, creada.getPrioridad());
   }
 
   /* ---- Acceso al detalle y al cambio de estado ---- */

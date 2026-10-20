@@ -64,6 +64,7 @@ public class FormspreeNotificador {
 		campos.put("ticket", evento.ticket());
 		campos.put("evento", evento.tipo().getAsunto());
 		campos.put("estado", evento.estado());
+		campos.put("prioridad", evento.prioridad());
 		campos.put("solicitante", evento.solicitanteNombre());
 		campos.put("tecnico", evento.tecnico());
 		campos.put("equipo", evento.equipo());
